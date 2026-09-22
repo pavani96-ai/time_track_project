@@ -1,0 +1,9 @@
+.env
+.env.*
+.git
+.gitignore
+.venv
+__pycache__
+*.py[cod]
+timetrack.db
+*.log

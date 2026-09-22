@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TimeTrack Agent</title>
+  <style>
+    :root { --ink: #17211b; --muted: #66736a; --paper: #f4f0e7; --panel: #fffdf8; --line: #d9d2c3; --accent: #e15c35; --accent-dark: #b64223; --green: #2b6b55; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; color: var(--ink); background: radial-gradient(circle at 10% 0%, #e5ead7 0, transparent 34%), var(--paper); font-family: Georgia, 'Times New Roman', serif; }
+    .shell { width: min(1080px, calc(100% - 40px)); margin: 0 auto; padding: 42px 0 56px; }
+    header { display: flex; justify-content: space-between; gap: 24px; align-items: end; margin-bottom: 34px; }
+    .eyebrow { color: var(--green); font: 700 12px/1.2 Arial, sans-serif; letter-spacing: .13em; text-transform: uppercase; }
+    h1 { font-size: clamp(42px, 7vw, 78px); line-height: .92; letter-spacing: -.04em; margin: 10px 0 0; max-width: 600px; }
+    .status { display: flex; align-items: center; gap: 8px; color: var(--muted); font: 14px Arial, sans-serif; white-space: nowrap; }
+    .status::before { content: ''; width: 9px; height: 9px; border-radius: 50%; background: var(--green); }
+    .workspace { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(260px, .65fr); gap: 20px; align-items: start; }
+    .panel { background: rgba(255, 253, 248, .86); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 16px 40px rgba(70, 57, 36, .08); }
+    .conversation { min-height: 540px; display: flex; flex-direction: column; }
+    .messages { flex: 1; padding: 24px; display: flex; flex-direction: column; gap: 16px; }
+    .message { max-width: 88%; padding: 15px 17px; border-radius: 4px; white-space: pre-wrap; line-height: 1.5; font-size: 17px; }
+    .message.agent { background: #e9efe2; align-self: flex-start; }
+    .message.user { background: var(--ink); color: #fffdf8; align-self: flex-end; }
+    .empty { margin: auto; max-width: 390px; text-align: center; color: var(--muted); line-height: 1.55; }
+    form { display: flex; gap: 10px; padding: 16px; border-top: 1px solid var(--line); }
+    textarea { flex: 1; min-height: 54px; resize: vertical; border: 1px solid var(--line); border-radius: 4px; padding: 14px; color: var(--ink); background: #fff; font: 16px/1.4 Arial, sans-serif; }
+    textarea:focus { outline: 2px solid rgba(225, 92, 53, .3); border-color: var(--accent); }
+    button { border: 0; border-radius: 4px; background: var(--accent); color: #fff; padding: 0 21px; font: 700 14px Arial, sans-serif; cursor: pointer; }
+    button:hover { background: var(--accent-dark); }
+    button:disabled { cursor: wait; opacity: .6; }
+    aside { padding: 23px; }
+    h2 { margin: 0 0 10px; font-size: 24px; }
+    aside p { color: var(--muted); line-height: 1.5; margin: 0 0 22px; }
+    .prompt { display: block; width: 100%; padding: 13px 14px; margin-top: 9px; text-align: left; color: var(--ink); background: #f0eadc; font: 15px Georgia, serif; }
+    .prompt:hover { background: #e8dfcf; }
+    @media (max-width: 760px) {
+      .shell { width: min(100% - 24px, 620px); padding-top: 26px; }
+      header { display: block; }
+      .status { margin-top: 18px; }
+      .workspace { grid-template-columns: 1fr; }
+      .conversation { min-height: 500px; }
+      form { align-items: stretch; flex-direction: column; }
+      button { min-height: 46px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header>
+      <div><div class="eyebrow">TimeTrack / Agent workspace</div><h1>Make time<br>legible.</h1></div>
+      <div class="status" id="status">Ready to help</div>
+    </header>
+    <section class="workspace">
+      <div class="panel conversation">
+        <div class="messages" id="messages">
+          <div class="empty" id="empty">Ask about entries, projects, or log new work. The agent can query and update your time ledger for you.</div>
+        </div>
+        <form id="agent-form">
+          <textarea id="message" aria-label="Message" placeholder="What would you like to know?" required></textarea>
+          <button id="send" type="submit">Send</button>
+        </form>
+      </div>
+      <aside class="panel">
+        <h2>Try a prompt</h2>
+        <p>Use natural language. The agent chooses the right TimeTrack tool for the request.</p>
+        <button class="prompt">Show Asha Patel's entries</button>
+        <button class="prompt">Which projects have time logged?</button>
+        <button class="prompt">Log 2 hours for Website Redesign today for research</button>
+      </aside>
+    </section>
+  </main>
+  <script>
+    const form = document.querySelector('#agent-form');
+    const input = document.querySelector('#message');
+    const send = document.querySelector('#send');
+    const messages = document.querySelector('#messages');
+    const empty = document.querySelector('#empty');
+    const status = document.querySelector('#status');
+
+    function addMessage(text, role) {
+      empty?.remove();
+      const item = document.createElement('div');
+      item.className = `message ${role}`;
+      item.textContent = text;
+      messages.appendChild(item);
+      item.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const message = input.value.trim();
+      if (!message) return;
+      addMessage(message, 'user');
+      input.value = '';
+      send.disabled = true;
+      status.textContent = 'Working...';
+      try {
+        const response = await fetch('/api/agent', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message })
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.detail || 'The agent could not complete that request.');
+        addMessage(data.response, 'agent');
+        status.textContent = 'Ready to help';
+      } catch (error) {
+        addMessage(error.message, 'agent');
+        status.textContent = 'Connection issue';
+      } finally {
+        send.disabled = false;
+        input.focus();
+      }
+    });
+
+    document.querySelectorAll('.prompt').forEach((button) => {
+      button.addEventListener('click', () => { input.value = button.textContent; input.focus(); });
+    });
+  </script>
+</body>
+</html>

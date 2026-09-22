@@ -1,0 +1,14 @@
+[project]
+name = "time-track-project"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "anthropic>=1.7.0",
+    "fastmcp>=4.0.5",
+    "fastapi>=0.115.0",
+    "mcp>=2.2.0",
+    "python-dotenv>=1.0.0",
+    "uvicorn[standard]>=0.30.0",
+]
