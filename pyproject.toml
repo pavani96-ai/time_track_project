@@ -12,3 +12,5 @@ dependencies = [
     "python-dotenv>=1.0.0",
     "uvicorn[standard]>=0.30.0",
 ]
+[tool.vercel]
+entrypoint = "api:app"
